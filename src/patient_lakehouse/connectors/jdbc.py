@@ -22,7 +22,9 @@ class JdbcConnector:
         dsn = os.environ.get(dsn_env)
         if not dsn:
             raise RuntimeError(f"Required JDBC connection environment variable {dsn_env!r} is not set")
-        query = opts["query"]
+        query = opts.get("incremental_query" if watermark else "full_query", opts.get("query"))
+        if not query:
+            raise ValueError("JDBC source metadata must configure full_query or query")
         params = {}
         if metadata.watermark_column and watermark:
             # Query must contain one named :watermark placeholder; drivers map it safely.
@@ -30,6 +32,8 @@ class JdbcConnector:
                 raise ValueError("Incremental JDBC query must use a :watermark parameter")
             params["watermark"] = watermark_lower_bound(
                 watermark, int(opts.get("watermark_lookback_seconds", 0)))
+        elif ":watermark" in query:
+            raise ValueError("JDBC full_query must not contain a :watermark placeholder")
         connection = driver.connect(dsn)
         try:
             cursor = connection.cursor()

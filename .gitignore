@@ -5,6 +5,9 @@ build/
 .coverage
 .pytest_cache/
 .terraform/
+.databricks/
+dist/
+*.egg-info/
 terraform.tfstate*
 *.tfstate
 *.tfstate.backup

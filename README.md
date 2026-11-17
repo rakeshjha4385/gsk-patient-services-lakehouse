@@ -20,6 +20,7 @@ Python 3.11+; the local runtime uses only the standard library.
 ```bash
 python -m pip install -e .
 patient-lakehouse sample-run --output ./build/sample-run
+patient-lakehouse sample-jdbc --output ./build/sample-jdbc --patients 250 --seed 42
 ```
 
 This generates synthetic CDC events and executes the configured pipeline. Inspect `build/sample-run/lakehouse` for Bronze, Silver, Gold, quarantine, control database, and per-run quality/audit/reconciliation artifacts.
@@ -39,6 +40,8 @@ export PII_HMAC_KEY="inject-from-a-secret-manager-in-real-environments"
 patient-lakehouse run --dataset pmp_patient_services --state-dir ./build/lakehouse
 patient-lakehouse diagnose --run-dir ./build/lakehouse/runs/<run-id>
 ```
+
+The synthetic JDBC profile seeds a SQLite source and runs the same metadata, quality, quarantine, Silver, Gold, audit, and watermark controls. The Databricks Asset Bundle runs that profile through Spark JDBC and the Delta sink. See [Databricks Workflow setup](docs/databricks-workflow.md).
 
 The local synthetic profile uses a fixed, local-only HMAC key. Production execution requires a managed secret configured as `PII_HMAC_KEY`; do not use a shell literal in a real environment.
 

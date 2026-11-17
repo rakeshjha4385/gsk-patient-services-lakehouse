@@ -12,10 +12,12 @@ from patient_lakehouse.connectors import default_connectors
 from patient_lakehouse.connectors.salesforce_bulk import SalesforceBulkApiConnector
 from patient_lakehouse.control import ControlStore
 from patient_lakehouse.engine import MetadataDrivenIngestion
+from patient_lakehouse.gold import GoldProductPublisher
 from patient_lakehouse.metadata import MetadataRegistry
 from patient_lakehouse.model import TableMetadata
 from patient_lakehouse.storage import LocalJsonSink
 from patient_lakehouse.synthetic import generate
+from patient_lakehouse.synthetic_jdbc import seed_synthetic_jdbc
 
 ROOT = Path(__file__).parents[1]
 
@@ -137,6 +139,30 @@ class FrameworkTests(unittest.TestCase):
                 self.assertTrue((base / "lake/runs" / first.run_id / "quality.json").exists())
             finally:
                 os.environ.pop("PMP_CDC_FIXTURE", None)
+                os.environ.pop("LAKEHOUSE_ROOT", None)
+
+    def test_synthetic_jdbc_runs_quality_silver_and_gold_pipeline(self):
+        with tempfile.TemporaryDirectory() as temp:
+            base = Path(temp)
+            database = base / "source/patients.sqlite"
+            seed_synthetic_jdbc(database, patients=150, seed=17)
+            os.environ["SYNTHETIC_JDBC_DSN"] = str(database)
+            os.environ["LAKEHOUSE_ROOT"] = str(base / "lake")
+            try:
+                engine = MetadataDrivenIngestion(
+                    MetadataRegistry(ROOT / "config/metadata"), default_connectors(), LocalJsonSink(),
+                    ControlStore(base / "control.sqlite"), pii_key=b"jdbc-test-only",
+                    downstream=GoldProductPublisher(base / "lake/gold"))
+                result = engine.execute("jdbc_synthetic_patient_services")
+                self.assertEqual(result.status, "SUCCEEDED")
+                self.assertEqual((result.source_count, result.accepted_count, result.rejected_count), (150, 149, 1))
+                self.assertEqual(result.silver_count, 149)
+                self.assertIsNone(result.watermark)  # reject remains replayable until corrected
+                gold = (base / "lake/gold/program_status.jsonl").read_text()
+                self.assertNotIn("SYN-", gold)
+                self.assertTrue((base / "lake/quarantine").is_dir())
+            finally:
+                os.environ.pop("SYNTHETIC_JDBC_DSN", None)
                 os.environ.pop("LAKEHOUSE_ROOT", None)
 
     def test_metadata_rejects_incremental_without_watermark(self):

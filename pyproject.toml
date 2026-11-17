@@ -10,6 +10,7 @@ description = "Metadata-driven patient services lakehouse ingestion framework"
 
 [project.scripts]
 patient-lakehouse = "patient_lakehouse.cli:main"
+databricks-jdbc-sample = "patient_lakehouse.databricks_job:main"
 
 [project.optional-dependencies]
 delta = ["pyspark>=3.5", "delta-spark>=3.1"]
@@ -17,6 +18,9 @@ delta = ["pyspark>=3.5", "delta-spark>=3.1"]
 [tool.setuptools.packages.find]
 where = ["src"]
 include = ["patient_lakehouse*"]
+
+[tool.setuptools.package-data]
+patient_lakehouse = ["resources/metadata/*.json"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

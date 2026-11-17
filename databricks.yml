@@ -1,0 +1,29 @@
+bundle:
+  name: patient-services-lakehouse
+
+include:
+  - resources/*.yml
+
+artifacts:
+  default:
+    type: whl
+    path: .
+    build: python3 -m pip wheel . --no-deps --wheel-dir dist
+
+variables:
+  catalog:
+    description: Existing Unity Catalog catalog for the synthetic workflow volume.
+    default: main
+  schema:
+    description: Existing Unity Catalog schema for the synthetic workflow volume.
+    default: default
+  volume:
+    description: Existing Unity Catalog volume writable by the job identity.
+    default: synthetic_ingestion
+
+targets:
+  dev:
+    mode: development
+    default: true
+    workspace:
+      profile: agent

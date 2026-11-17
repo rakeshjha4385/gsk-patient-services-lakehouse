@@ -1,0 +1,32 @@
+{
+  "active": true,
+  "dataset": "jdbc_synthetic_patient_services",
+  "source_name": "synthetic_patient_services_jdbc",
+  "source_type": "JDBC",
+  "ingestion_mode": "INCREMENTAL",
+  "bronze_path": "${LAKEHOUSE_ROOT}/bronze/jdbc_synthetic_patient_services",
+  "silver_path": "${LAKEHOUSE_ROOT}/silver/jdbc_synthetic_patient_services",
+  "primary_key": ["patient_id"],
+  "watermark_column": "SystemModstamp",
+  "required_columns": ["patient_id", "program", "status", "consent", "SystemModstamp", "source_version"],
+  "pii_columns": ["patient_id"],
+  "outbound_requires_consent": true,
+  "max_reject_rate": 0.01,
+  "retries": 2,
+  "allowed_values": {
+    "program": ["RESPIRA", "IMMUNO", "ONCOLOGY"],
+    "status": ["ENROLLED", "CONTACTED", "SERVICE_ACTIVE", "COMPLETED"]
+  },
+  "source_options": {
+    "driver_module": "sqlite3",
+    "dsn_env": "SYNTHETIC_JDBC_DSN",
+    "jdbc_url_env": "SYNTHETIC_JDBC_URL",
+    "driver": "org.sqlite.JDBC",
+    "table": "patient_services",
+    "full_query": "SELECT patient_id, program, status, consent, SystemModstamp, source_version FROM patient_services",
+    "incremental_query": "SELECT patient_id, program, status, consent, SystemModstamp, source_version FROM patient_services WHERE SystemModstamp > :watermark",
+    "watermark_lookback_seconds": 300,
+    "max_driver_records": 5000,
+    "data_types": {"patient_id": "string", "program": "string", "status": "string", "consent": "integer", "source_version": "integer"}
+  }
+}

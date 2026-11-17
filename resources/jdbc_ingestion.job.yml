@@ -1,0 +1,46 @@
+resources:
+  jobs:
+    jdbc_patient_services_ingestion:
+      name: ${bundle.target}-jdbc-patient-services-ingestion
+      description: Synthetic JDBC ingestion through metadata, validation, Delta, and monitoring controls.
+      max_concurrent_runs: 1
+      timeout_seconds: 1800
+      tags:
+        application: patient-services-lakehouse
+        source: synthetic-jdbc
+      job_clusters:
+        - job_cluster_key: jdbc_ingestion_cluster
+          new_cluster:
+            spark_version: 15.4.x-scala2.12
+            node_type_id: Standard_DS3_v2
+            driver_node_type_id: Standard_DS3_v2
+            num_workers: 0
+            data_security_mode: SINGLE_USER
+            single_user_name: ${workspace.current_user.userName}
+            azure_attributes:
+              availability: ON_DEMAND_AZURE
+            spark_conf:
+              spark.databricks.cluster.profile: singleNode
+              spark.master: local[*]
+            custom_tags:
+              workload: synthetic-jdbc-ingestion
+      tasks:
+        - task_key: ingest_synthetic_patient_services_jdbc
+          job_cluster_key: jdbc_ingestion_cluster
+          timeout_seconds: 1500
+          max_retries: 1
+          min_retry_interval_millis: 30000
+          retry_on_timeout: true
+          python_wheel_task:
+            package_name: patient_services_lakehouse_platform
+            entry_point: databricks-jdbc-sample
+            named_parameters:
+              catalog: ${var.catalog}
+              schema: ${var.schema}
+              volume: ${var.volume}
+              patients: "250"
+              seed: "42"
+          libraries:
+            - whl: ./dist/*.whl
+            - maven:
+                coordinates: org.xerial:sqlite-jdbc:3.46.1.0

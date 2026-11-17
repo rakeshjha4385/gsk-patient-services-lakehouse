@@ -13,6 +13,7 @@ from .gold import GoldProductPublisher
 from .metadata import MetadataRegistry
 from .storage import LocalJsonSink
 from .synthetic import generate
+from .synthetic_jdbc import seed_synthetic_jdbc
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -36,6 +37,8 @@ def main() -> None:
     run_cmd.add_argument("--metadata", type=Path, default=ROOT / "config/metadata")
     run_cmd.add_argument("--state-dir", type=Path, default=Path("build/lakehouse"))
     sample_cmd = sub.add_parser("sample-run"); sample_cmd.add_argument("--output", type=Path, default=Path("build/sample-run"))
+    jdbc_cmd = sub.add_parser("sample-jdbc"); jdbc_cmd.add_argument("--output", type=Path, default=Path("build/sample-jdbc"))
+    jdbc_cmd.add_argument("--patients", type=int, default=250); jdbc_cmd.add_argument("--seed", type=int, default=42)
     diagnose_cmd = sub.add_parser("diagnose"); diagnose_cmd.add_argument("--run-dir", type=Path, required=True)
     args = parser.parse_args()
     if args.command == "generate":
@@ -55,6 +58,14 @@ def main() -> None:
         state_dir = output / "lakehouse"
         os.environ["LAKEHOUSE_ROOT"] = str(state_dir)
         result = build_engine(ROOT / "config/metadata", state_dir, synthetic_profile=True).execute("pmp_patient_services")
+    elif args.command == "sample-jdbc":
+        output = args.output.resolve()
+        source_path = output / "source" / "patients.sqlite"
+        seed_synthetic_jdbc(source_path, args.patients, args.seed)
+        os.environ["SYNTHETIC_JDBC_DSN"] = str(source_path)
+        state_dir = output / "lakehouse"
+        os.environ["LAKEHOUSE_ROOT"] = str(state_dir)
+        result = build_engine(ROOT / "config/metadata", state_dir, synthetic_profile=True).execute("jdbc_synthetic_patient_services")
     else:
         state_dir = args.state_dir.resolve()
         os.environ["LAKEHOUSE_ROOT"] = str(state_dir)
