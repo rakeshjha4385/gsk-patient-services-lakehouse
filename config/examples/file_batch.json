@@ -1,0 +1,12 @@
+{
+  "active": false,
+  "dataset": "provider_file_batch_example",
+  "source_name": "secure_file_drop",
+  "source_type": "FILE",
+  "ingestion_mode": "FULL",
+  "bronze_path": "abfss://bronze/provider_file",
+  "silver_path": "abfss://silver/provider_file",
+  "primary_key": ["provider_id"],
+  "required_columns": ["provider_id"],
+  "source_options": {"path": "abfss://landing/providers.csv", "format": "csv"}
+}

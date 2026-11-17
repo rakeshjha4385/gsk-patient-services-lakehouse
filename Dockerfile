@@ -1,7 +1,8 @@
 FROM python:3.11-slim
 WORKDIR /app
 COPY pyproject.toml README.md ./
-COPY lakehouse_demo ./lakehouse_demo
+COPY src ./src
 COPY config ./config
-ENTRYPOINT ["python", "-m", "lakehouse_demo.cli"]
+RUN pip install --no-cache-dir .
+ENTRYPOINT ["patient-lakehouse"]
 CMD ["demo", "--output", "/data/demo"]

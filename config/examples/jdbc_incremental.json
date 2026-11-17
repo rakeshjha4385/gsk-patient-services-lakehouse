@@ -1,0 +1,13 @@
+{
+  "active": false,
+  "dataset": "claims_jdbc_incremental_example",
+  "source_name": "claims_warehouse",
+  "source_type": "JDBC",
+  "ingestion_mode": "INCREMENTAL",
+  "bronze_path": "abfss://bronze/claims",
+  "silver_path": "abfss://silver/claims",
+  "primary_key": ["claim_id"],
+  "watermark_column": "modified_at",
+  "required_columns": ["claim_id", "modified_at"],
+  "source_options": {"driver_module": "psycopg", "dsn_env": "CLAIMS_JDBC_DSN", "query": "SELECT claim_id, modified_at FROM claims WHERE modified_at > :watermark"}
+}

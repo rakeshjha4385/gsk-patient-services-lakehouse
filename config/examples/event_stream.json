@@ -1,0 +1,13 @@
+{
+  "active": false,
+  "dataset": "patient_interaction_stream_example",
+  "source_name": "patient_interaction_events",
+  "source_type": "STREAMING",
+  "ingestion_mode": "STREAMING",
+  "bronze_path": "abfss://bronze/patient_interactions",
+  "silver_path": "abfss://silver/patient_interactions",
+  "primary_key": ["event_id"],
+  "watermark_column": "event_time",
+  "required_columns": ["event_id", "event_time"],
+  "source_options": {"path": "abfss://landing/event-fixture.jsonl", "format": "jsonl", "max_records_per_batch": 10000}
+}

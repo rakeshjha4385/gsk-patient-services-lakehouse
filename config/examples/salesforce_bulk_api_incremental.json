@@ -1,0 +1,13 @@
+{
+  "active": false,
+  "dataset": "patient_services_incremental_example",
+  "source_name": "salesforce_pmp",
+  "source_type": "SALESFORCE_BULK_API",
+  "ingestion_mode": "INCREMENTAL",
+  "bronze_path": "abfss://bronze/patient_services",
+  "silver_path": "abfss://silver/patient_services",
+  "primary_key": ["Id"],
+  "watermark_column": "SystemModstamp",
+  "required_columns": ["Id", "SystemModstamp", "Status__c", "Consent__c"],
+  "source_options": {"instance_url": "https://example.my.salesforce.com", "token_env": "SALESFORCE_ACCESS_TOKEN", "api_version": "v60.0", "object": "Patient__c", "fields": ["Id", "SystemModstamp", "Status__c", "Consent__c"], "data_types": {"Consent__c": "boolean"}, "max_job_seconds": 900, "page_size": 10000, "watermark_lookback_seconds": 300}
+}

@@ -1,27 +1,28 @@
-# 10-minute interview walkthrough
+# Principal data engineer walkthrough
 
-## Opening
+## Five-minute platform explanation
 
-“I built a small reference platform for a Salesforce Patient Management Services feed. It focuses on reusable controls: metadata-driven validation, idempotent CDC ingestion, consent-aware transformations, reconciliation, and safe operational assistance. All records are synthetic.”
+“This repository demonstrates a reusable ingestion platform rather than a one-off pipeline. Dataset metadata declares source and mode, keys, watermarks, validation rules, storage locations, privacy fields, and quality thresholds. A connector registry isolates source protocols; the generic engine owns control state, Bronze capture, validation, Silver merge, checkpoint safety, operational artifacts, and downstream handoff.”
 
-## Walk the pipeline
+## Walk the implementation
 
-1. Run `python -m lakehouse_demo.cli demo --output ./build/demo`.
-2. Show the contract at `config/pmp_patient_services.json` and explain how onboarding a new object becomes configuration plus contract review.
-3. Inspect `quarantine/rejected.csv`: bad enumerations are visible and measurable, not silently dropped.
-4. Compare quality and reconciliation gates; explain that failed gates prevent the CLI run from succeeding.
-5. Show the outbound feed contains pseudonymous keys and only consented latest states.
-6. Show the agent report: read-only diagnosis, bounded recommendations, and explicit human review.
+1. Review `config/metadata/pmp_patient_services.json`: Salesforce-style PMP CDC, `SystemModstamp`, patient business key, event ID, consent, domains, and reject threshold.
+2. Review `src/patient_lakehouse/model.py` and `metadata.py`: typed, validated metadata contract and active registry.
+3. Review `connectors/`: connector contract and adapters for REST API, JDBC, files, CDC, and stream micro-batches.
+4. Run `patient-lakehouse demo --output ./build/demo`; inspect Bronze metadata, quarantine reasons, Silver latest state, consent-filtered Gold output, SQLite control state, and per-run audit/quality/reconciliation artifacts.
+5. Show `ControlStore.finish_run`: only successful runs advance watermark and event ledger; failed downstream work can safely replay.
+6. Compare `LocalJsonSink` with `DeltaLakeSink`: local mode keeps CI dependency-free, while the optional Spark sink uses Delta append and MERGE.
 
-## Principal-level discussion
+## Senior/principal engineering topics
 
-- At scale, use Delta transaction semantics and a durable event ledger; partition for workload access rather than over-partitioning by patient.
-- Separate ingestion, contract, transformation, and policy metadata, with owners, versions, effective dates, and approval workflow.
-- Protect PHI with managed identity, Key Vault, Unity Catalog grants, masking, row filters, private networking, audit logs, and retention controls.
-- Coordinate Salesforce Bulk API windows with a token bucket, bounded concurrency, exponential backoff, retry classification, dead-letter replay, and reconciliation before checkpoint commit.
-- For autonomous remediation, begin with shadow recommendations and offline evaluation. Promote only specific low-risk tools behind least privilege, typed inputs, approvals, immutable audit, and rollback.
-- For GxP/HIPAA/GDPR contexts, apply validated SDLC, traceability, change control, consent/legal-basis policies, retention/deletion, lineage, and jurisdictional review; the demo makes no compliance claim.
+- **Salesforce PMP:** discuss Bulk API v2 for high volumes, SOQL projection/filtering, SystemModstamp overlap, token bucket/API budget, retry classification, dead-letter handling, schema drift, OAuth via managed identity/Key Vault, and reconciliation before checkpointing.
+- **CDC correctness:** define event identity, ordering, tombstones, late arrival policy, exactly-once boundary, replay retention, and idempotent destination semantics before selecting a watermark.
+- **Metadata governance:** version contracts, owner approvals, environment overrides, compatibility policy, policy-as-code, rollout cohorts, and deprecation workflow.
+- **Spark performance:** tune file sizing/compaction, partitioning to actual predicates, adaptive query execution, Photon, shuffle/skew, Delta layout, cluster policy, and workload isolation using observed query plans and metrics.
+- **Privacy and quality:** classify fields, enforce consent purpose, pseudonymize with governed key lifecycle, record lineage and access audit, hold bad data without losing replayability, and agree on thresholds with data owners.
+- **AI operations:** run an operations agent read-only in shadow mode first; use allowlisted query tools, traced/evaluated prompts, least-privilege identity, human approval for remediation, and a measurable false-positive/rollback policy.
+- **Productionization:** validate GxP applicability, test evidence, change control, CI promotion, release rollback, DR, runbooks, SLOs, platform cost, and product ownership.
 
-## Honest scope statement
+## Scope statement
 
-This repository is an executable local prototype. It does not claim to deploy Azure resources, connect to Salesforce, process actual PHI, or demonstrate a production-grade AI agent. Describe which choices you would validate with security, privacy, clinical operations, Salesforce, and platform stakeholders before production.
+The active path is executable against synthetic records. API and JDBC connectors are implemented against generic HTTP/DB-API interfaces; the CDC and streaming local adapters use fixtures. Real Salesforce credentials, Azure provisioning, Event Hubs consumers, Key Vault integration, and organizational compliance validation are deployment-specific. The repository is a platform blueprint, not a claim of production certification.

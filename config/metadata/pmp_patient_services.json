@@ -1,0 +1,31 @@
+{
+  "active": true,
+  "dataset": "pmp_patient_services",
+  "source_name": "salesforce_pmp_patient__c",
+  "source_type": "CDC",
+  "ingestion_mode": "CDC",
+  "bronze_path": "${LAKEHOUSE_ROOT}/bronze/pmp_patient_services",
+  "silver_path": "${LAKEHOUSE_ROOT}/silver/pmp_patient_services",
+  "primary_key": ["patient_id"],
+  "event_id_column": "event_id",
+  "operation_column": "operation",
+  "watermark_column": "SystemModstamp",
+  "required_columns": ["event_id", "patient_id", "program", "status", "operation", "consent", "SystemModstamp", "source_version"],
+  "pii_columns": ["patient_id"],
+  "outbound_requires_consent": true,
+  "max_reject_rate": 0.03,
+  "retries": 3,
+  "allowed_values": {
+    "program": ["RESPIRA", "IMMUNO", "ONCOLOGY"],
+    "status": ["ENROLLED", "CONTACTED", "SERVICE_ACTIVE", "COMPLETED"],
+    "operation": ["INSERT", "UPDATE", "DELETE"]
+  },
+  "source_options": {
+    "path": "env:PMP_CDC_FIXTURE",
+    "format": "jsonl",
+    "watermark_lookback_seconds": 300,
+    "watermark_lookback_seconds": 300,
+    "silver_order_column": "source_version",
+    "data_types": {"patient_id": "string", "event_id": "string", "consent": "boolean", "source_version": "integer"}
+  }
+}

@@ -1,37 +1,60 @@
-# Architecture and production evolution
+# Architecture and engineering decisions
 
-## Flow
+## Metadata-driven execution
 
-```mermaid
-flowchart LR
-  SF[Salesforce PMP CDC export] --> I[Metadata registry + ingestion]
-  I --> B[Bronze immutable events]
-  B --> V[Validation, dedupe, quarantine]
-  V --> S[Silver pseudonymous latest state]
-  S --> G[Gold consented aggregates]
-  S --> O[Consent-gated outbound change feed]
-  V --> Q[Quality + reconciliation + audit]
-  Q --> A[Read-only operations agent]
-```
+The execution contract is implemented by `MetadataDrivenIngestion` in `src/patient_lakehouse/engine.py`:
 
-## Key decisions
+1. **Read active metadata.** `MetadataRegistry` loads the dataset contract, required fields, source connector, keys, watermark, storage targets, and quality policies.
+2. **Select strategy.** `ConnectorRegistry` resolves REST API, JDBC, file, CDC, or streaming source; `ingestion_mode` configures full, incremental, CDC, or streaming behavior.
+3. **Read control state.** `ControlStore` returns the last successfully committed watermark and previously accepted CDC event IDs.
+4. **Extract.** The connector applies watermark predicates, pagination/batch limits, credentials by environment reference, retries, and source-specific normalization.
+5. **Append Bronze.** Raw source records are retained with run ID, source identity/type, ingest timestamp, and mode.
+6. **Validate.** Required fields, null keys, event duplicates, configured primitive types, allowed values, and optional timestamp rules produce accepted and quarantined sets.
+7. **Merge Silver.** Configured PII fields are HMAC-tokenized; CDC INSERT/UPDATE/DELETE records merge by business key. The local sink performs an idempotent JSONL state merge; `DeltaLakeSink` executes Delta `MERGE` in Spark.
+8. **Update operational state.** Runs record status, counts, duration, error and reconciliation. Watermark and event ledger commit transactionally only on success. If rows are quarantined, the watermark is held to allow corrected records to be replayed.
+9. **Trigger downstream.** A consent-filtered Gold product is published locally; the callback boundary maps to Databricks Workflows, ADF, or an authorized outbound integration in production.
 
-- **Idempotency:** event IDs are the ingestion ledger key. A production implementation should persist this ledger transactionally in Delta and handle late events with event-time watermarks.
-- **Schema evolution:** required and enumerated values are configuration-controlled; incompatible rows are quarantined with stable reason codes. Additive changes should require contract review and compatibility tests.
-- **Privacy:** direct IDs are HMAC-tokenized before the curated layer. Consent is evaluated before the outbound change feed. This sample's per-run secret makes tokens non-linkable across runs and is not a production key strategy.
-- **Bidirectional sync:** outbound rows carry a deterministic idempotency key. A real Salesforce Bulk API worker would add OAuth via Key Vault, rate-limit budgeting, retry/backoff, dead-letter handling, and source-target reconciliation before checkpoint advancement.
-- **Agent controls:** the agent can read only three run artifacts, emits recommendations, and cannot invoke mutation tools. Production orchestration should require scoped identity, explicit tool allowlists, human approval for remediation, trace/evaluation records, and prompt-injection defenses.
-- **Observability:** quality and reconciliation outputs are explicit gates; metrics and audit artifacts support operational triage. A production service would export structured metrics/traces and alert on freshness, volume drift, rejection rate, API limits, and stuck watermarks.
+## Connector contract
 
-## Azure mapping
+Each connector implements `extract(metadata, watermark) -> IngestionBatch`. It returns records plus source counts, extraction timestamp, next watermark, and optional source offset. Source-specific code stays outside the generic orchestration engine.
 
-| Concern | Local example | Azure / Databricks candidate |
+| Source | Local reference behavior | Production adapter direction |
 |---|---|---|
-| Landing | JSONL | ADLS Gen2, Event Hubs, ADF/API copy |
-| Transform | Python | Databricks Jobs, PySpark, Delta Lake |
-| Governance | JSON contract | Unity Catalog, Entra groups, row/column controls |
-| Secrets | ephemeral run key | Key Vault + managed identity |
-| CI/CD | GitHub Actions | Actions or Azure DevOps, Terraform/Bicep, Asset Bundles |
-| Salesforce | fixture and outbound CSV | Bulk API / REST / platform events with throttling |
+| REST API | JSON pagination, bearer token env var, timeout, retry/backoff, watermark query param | General OAuth-protected API adapter |
+| Salesforce Bulk API v2 | Async query job, bounded polling, locator pagination, field coercion, bearer token env var | Key Vault-backed OAuth, API budget telemetry, source reconciliation |
+| JDBC | DB-API driver module, secret DSN env var, parameterized watermark SQL | Spark JDBC with partitioning, fetch size, read consistency, and secret scope |
+| File | CSV, JSON, JSONL | ADLS/ABFS landing, manifest/checksum, schema registry, event-time partitioning |
+| CDC | CDC envelope normalization and operation mapping | Salesforce Platform Events, database CDC, durable event IDs and offset checkpoints |
+| Streaming | Bounded fixture micro-batches | Event Hubs/Kafka Structured Streaming, checkpoint location and event-time handling |
 
-The Terraform directory intentionally provisions only a minimal storage account and container as an illustrative scaffold. Networking, private endpoints, identity, diagnostic settings, policy, encryption configuration, and environment state must be designed for the target organization before deployment.
+## State and delivery semantics
+
+- Bronze is append-only, so failed validation can be diagnosed and replayed.
+- The event ledger suppresses already committed CDC IDs. It is committed with the run status and watermark in one SQLite transaction for the local implementation; use a Delta control table or transactional metadata store in production.
+- A failed merge or downstream trigger leaves the watermark unchanged. Silver merge keys and event IDs make re-execution safe.
+- If a run contains rejected records below the configured threshold, its watermark is held, permitting remediation and replay. This trades extra source reads for safer recovery.
+- Reconciliation balances extracted = accepted + rejected and tracks resulting Silver state separately because CDC deletes and upserts make row counts differ.
+- Current local event-ledger lookup uses a relational control table; production should batch/look up keys efficiently and govern retention based on source replay guarantees.
+
+## Security and governance
+
+- Credentials are referenced by environment variable name, never embedded in metadata. Production uses Key Vault plus managed identity.
+- PII tokenization requires a key. The CLI demo passes a fixed local-only synthetic key; production key lifecycle and stable tokenization domain must be designed with privacy/security owners.
+- Consent is applied before the Gold product. Outbound Salesforce synchronization should add per-record consent and purpose checks at the final connector boundary.
+- Apply least privilege through Unity Catalog and Entra groups; mask direct identifiers and constrain row access where appropriate.
+- Persist lineage, config version/hash, schema version, user/service identity, and approval references in production audit records.
+
+## Azure platform mapping
+
+| Capability | Azure pattern |
+|---|---|
+| Orchestration | ADF for source coordination; Databricks Workflows for lakehouse dependencies |
+| Landing | ADLS Gen2 bronze zone, source manifests and immutable retention |
+| Transformation | Databricks PySpark with Delta Lake and optimized incremental MERGE |
+| Streaming | Event Hubs + Structured Streaming checkpoints |
+| Governance | Unity Catalog, Entra groups, tags, lineage, row filters, column masks |
+| Secrets and identity | Key Vault, managed identities, private endpoints |
+| Delivery | GitHub Actions or Azure DevOps, Terraform/Bicep, Databricks Asset Bundles |
+| Observability | Structured run events, Databricks/ADF metrics, Log Analytics and actionable alerts |
+
+The Terraform sample creates a resource group, private container, and storage account only. Network isolation, private endpoints, identities, diagnostic settings, policies, encryption, state backend, and workspace integration need environment-specific design.
