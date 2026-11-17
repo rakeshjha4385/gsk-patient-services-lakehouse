@@ -5,4 +5,4 @@ COPY src ./src
 COPY config ./config
 RUN pip install --no-cache-dir .
 ENTRYPOINT ["patient-lakehouse"]
-CMD ["demo", "--output", "/data/demo"]
+CMD ["sample-run", "--output", "/data/sample-run"]

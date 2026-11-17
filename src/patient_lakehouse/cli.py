@@ -17,11 +17,11 @@ from .synthetic import generate
 ROOT = Path(__file__).resolve().parents[2]
 
 
-def build_engine(metadata_dir: Path, state_dir: Path, demo_key: bool = False):
+def build_engine(metadata_dir: Path, state_dir: Path, synthetic_profile: bool = False):
     return MetadataDrivenIngestion(
         MetadataRegistry(metadata_dir), default_connectors(), LocalJsonSink(),
         ControlStore(state_dir / "control.sqlite"),
-        pii_key=(b"local-only-synthetic-key-rotate-in-production" if demo_key else None),
+        pii_key=(b"local-only-synthetic-key-rotate-in-production" if synthetic_profile else None),
         downstream=GoldProductPublisher(state_dir / "gold"),
     )
 
@@ -35,7 +35,7 @@ def main() -> None:
     run_cmd = sub.add_parser("run"); run_cmd.add_argument("--dataset", default="pmp_patient_services")
     run_cmd.add_argument("--metadata", type=Path, default=ROOT / "config/metadata")
     run_cmd.add_argument("--state-dir", type=Path, default=Path("build/lakehouse"))
-    demo_cmd = sub.add_parser("demo"); demo_cmd.add_argument("--output", type=Path, default=Path("build/demo"))
+    sample_cmd = sub.add_parser("sample-run"); sample_cmd.add_argument("--output", type=Path, default=Path("build/sample-run"))
     diagnose_cmd = sub.add_parser("diagnose"); diagnose_cmd.add_argument("--run-dir", type=Path, required=True)
     args = parser.parse_args()
     if args.command == "generate":
@@ -47,14 +47,14 @@ def main() -> None:
         (args.run_dir / "agent_report.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
         print(json.dumps(report, indent=2))
         return
-    if args.command == "demo":
+    if args.command == "sample-run":
         output = args.output.resolve()
         input_dir = output / "input"
         generate(input_dir)
         os.environ["PMP_CDC_FIXTURE"] = str(input_dir / "pmp_cdc.jsonl")
         state_dir = output / "lakehouse"
         os.environ["LAKEHOUSE_ROOT"] = str(state_dir)
-        result = build_engine(ROOT / "config/metadata", state_dir, demo_key=True).execute("pmp_patient_services")
+        result = build_engine(ROOT / "config/metadata", state_dir, synthetic_profile=True).execute("pmp_patient_services")
     else:
         state_dir = args.state_dir.resolve()
         os.environ["LAKEHOUSE_ROOT"] = str(state_dir)

@@ -2,14 +2,14 @@
 
 ## Five-minute platform explanation
 
-“This repository demonstrates a reusable ingestion platform rather than a one-off pipeline. Dataset metadata declares source and mode, keys, watermarks, validation rules, storage locations, privacy fields, and quality thresholds. A connector registry isolates source protocols; the generic engine owns control state, Bronze capture, validation, Silver merge, checkpoint safety, operational artifacts, and downstream handoff.”
+“This repository implements a reusable ingestion platform. Dataset metadata declares source and mode, keys, watermarks, validation rules, storage locations, privacy fields, and quality thresholds. A connector registry isolates source protocols; the generic engine owns control state, Bronze capture, validation, Silver merge, checkpoint safety, operational artifacts, and downstream handoff.”
 
 ## Walk the implementation
 
 1. Review `config/metadata/pmp_patient_services.json`: Salesforce-style PMP CDC, `SystemModstamp`, patient business key, event ID, consent, domains, and reject threshold.
 2. Review `src/patient_lakehouse/model.py` and `metadata.py`: typed, validated metadata contract and active registry.
 3. Review `connectors/`: connector contract and adapters for REST API, JDBC, files, CDC, and stream micro-batches.
-4. Run `patient-lakehouse demo --output ./build/demo`; inspect Bronze metadata, quarantine reasons, Silver latest state, consent-filtered Gold output, SQLite control state, and per-run audit/quality/reconciliation artifacts.
+4. Run `patient-lakehouse sample-run --output ./build/sample-run`; inspect Bronze metadata, quarantine reasons, Silver latest state, consent-filtered Gold output, SQLite control state, and per-run audit/quality/reconciliation artifacts.
 5. Show `ControlStore.finish_run`: only successful runs advance watermark and event ledger; failed downstream work can safely replay.
 6. Compare `LocalJsonSink` with `DeltaLakeSink`: local mode keeps CI dependency-free, while the optional Spark sink uses Delta append and MERGE.
 

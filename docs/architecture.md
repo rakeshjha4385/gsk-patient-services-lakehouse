@@ -39,7 +39,7 @@ Each connector implements `extract(metadata, watermark) -> IngestionBatch`. It r
 ## Security and governance
 
 - Credentials are referenced by environment variable name, never embedded in metadata. Production uses Key Vault plus managed identity.
-- PII tokenization requires a key. The CLI demo passes a fixed local-only synthetic key; production key lifecycle and stable tokenization domain must be designed with privacy/security owners.
+- PII tokenization requires a key. The local synthetic profile passes a fixed local-only key; production key lifecycle and stable tokenization domain must be designed with privacy/security owners.
 - Consent is applied before the Gold product. Outbound Salesforce synchronization should add per-record consent and purpose checks at the final connector boundary.
 - Apply least privilege through Unity Catalog and Entra groups; mask direct identifiers and constrain row access where appropriate.
 - Persist lineage, config version/hash, schema version, user/service identity, and approval references in production audit records.

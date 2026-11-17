@@ -19,10 +19,10 @@ Python 3.11+; the local runtime uses only the standard library.
 
 ```bash
 python -m pip install -e .
-patient-lakehouse demo --output ./build/demo
+patient-lakehouse sample-run --output ./build/sample-run
 ```
 
-This generates synthetic CDC events and executes the configured pipeline. Inspect `build/demo/lakehouse` for Bronze, Silver, Gold, quarantine, control database, and per-run quality/audit/reconciliation artifacts.
+This generates synthetic CDC events and executes the configured pipeline. Inspect `build/sample-run/lakehouse` for Bronze, Silver, Gold, quarantine, control database, and per-run quality/audit/reconciliation artifacts.
 
 Run the test suite:
 
@@ -40,7 +40,7 @@ patient-lakehouse run --dataset pmp_patient_services --state-dir ./build/lakehou
 patient-lakehouse diagnose --run-dir ./build/lakehouse/runs/<run-id>
 ```
 
-The demo command uses a fixed demonstration-only HMAC key. Production execution requires a managed secret configured as `PII_HMAC_KEY`; do not use a shell literal in a real environment.
+The local synthetic profile uses a fixed, local-only HMAC key. Production execution requires a managed secret configured as `PII_HMAC_KEY`; do not use a shell literal in a real environment.
 
 ## Execution flow
 
